@@ -1,0 +1,12 @@
+============================================================================
+ Static Scanner Gap Verification Report
+ Generated: 2026-04-19T08:52:32 UTC
+ Loader   : bin/loader
+ Payload  : bin/payload_elf
+============================================================================
+
+--- TEST 1: 'file' command magic-byte detection on LOADER ---
+(Does 'file' see an ELF inside the loader?)
+  Result: bin/loader: cannot open `bin/loader' (No such file or directory)
+ [0;31m[FAIL][0m 'file' output unexpected.
+
