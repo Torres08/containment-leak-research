@@ -1,0 +1,14 @@
+# Structurizr configuration and layout data
+.structurizr/
+architecture/.structurizr/
+
+# Compiled binaries and payload outputs
+poc/bin/
+!poc/bin/.gitkeep
+
+# Apptainer images
+*.sif
+
+# Temporary and log files
+*.log
+poc/logs/

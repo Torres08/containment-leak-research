@@ -34,7 +34,9 @@ int main(void) {
     int      c;
 
     buf = malloc(cap);
-    if (!buf) { perror("malloc"); return 1; }
+    if (!buf) { 
+        perror("malloc"); return 1; 
+    }
 
     /* Read entire payload into buffer */
     while ((c = getchar()) != EOF) {
