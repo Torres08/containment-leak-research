@@ -36,6 +36,7 @@
 #include <errno.h>
 #include <sys/mman.h>
 #include <sys/syscall.h>
+#include <sys/prctl.h>
 #include <linux/memfd.h>   /* F_SEAL_WRITE, F_SEAL_SHRINK, F_SEAL_GROW, F_SEAL_SEAL */
 
 /* Auto-generated during build by gen_xor_header */
@@ -67,6 +68,8 @@ static void xor_decode(unsigned char *out, const unsigned char *in, size_t len) 
  * ----------------------------------------------------------------------- */
 
 int main(int argc __attribute__((unused)), char *argv[] __attribute__((unused)), char *envp[]) {
+    /* Set a stable comm name so the LSM can target this loader precisely. */
+    (void)prctl(PR_SET_NAME, "loader", 0, 0, 0);
     fprintf(stderr,
         "[LOADER] ============================================================\n"
         "[LOADER] Fileless Loader\n"
