@@ -1,0 +1,51 @@
+# =============================================================================
+# Apptainer Definition File — nginx Web Server
+# Vilnius University MICAC — Containment Leak Research
+# =============================================================================
+# Based on the official Apptainer documentation nginx example:
+#   https://apptainer.org/docs/user/main/running_services.html#nginx-hello-world-in-apptainer
+#
+# The canonical minimal pattern from the Apptainer docs is:
+#
+#   Bootstrap: docker
+#   From: nginx
+#
+#   %startscript
+#       nginx
+#
+# This definition extends that pattern with:
+#   - nginx:alpine for a smaller image (same as Docker companion)
+#   - %files to embed the research lab web page
+#   - %labels for research identification
+#
+# Build:  apptainer build --fakeroot apptainer-victim.sif deployment/container.def
+# Start:  apptainer instance start --writable-tmpfs apptainer-victim.sif web
+# Stop:   apptainer instance stop web
+# Test:   curl localhost
+# =============================================================================
+
+Bootstrap: docker
+From: nginx:alpine
+
+# %files — copies the shared html content into the image (same source as Dockerfile COPY)
+%files
+    deployment/html/index.html /usr/share/nginx/html/index.html
+
+# %labels — image metadata
+%labels
+    Author          Juan Luis Torres Ramos
+    Institution     Vilnius University — MICAC Research Group
+    Application     nginx Web Application
+    Version         1.0
+    Base            nginx:alpine
+    Reference       https://apptainer.org/docs/user/main/running_services.html
+
+# %environment — runtime variables
+%environment
+    export LC_ALL=C
+
+# %startscript — runs when 'apptainer instance start' is called (background service mode)
+# This mirrors CMD ["nginx", "-g", "daemon off;"] in the Dockerfile.
+# "daemon off;" keeps nginx in the foreground so the container does not exit.
+%startscript
+    nginx -g "daemon off;"

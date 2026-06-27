@@ -1,102 +1,189 @@
-# Containment Leak Research
+# Empirical Reproduction Manual: Container Containment and the Static Scanner Gap
 
-**Student:** Juan Luis Torres Ramos  
-**Program:** MICAC (Cybersecurity), Vilnius University (VU MIF)  
-**Supervisor:** Assoc. Prof. Linas Bukauskas  
-**Title:** Research on methods for application containment
-
----
-
-## Hypothesis
-
-Modern security containers (Docker/Apptainer) suffer from a **Scanner Gap**.  
-Static file analysis fails to detect **ExecutableInExecutable** (T1027.002) attacks  malicious ELF binaries embedded inside legitimate files and executed directly from volatile memory via `memfd_create` + `fexecve`.
-
-Dynamic system-call monitoring at the container boundary (**eBPF / strace**) successfully intercepts the payload's syscall chain before an escape or data leak occurs.
+This repository contains the source code, kernel telemetry modules, containment profiles, and architectural models developed to investigate the **Static Scanner Gap in container runtimes. The project demonstrates an ExecutableInExecutable (MITRE ATT&CK T1027.002) evasion vector using memory-backed anonymous files (`memfd_create` + `fexecve`) and implements two defense strategies: 
+1. stateful dynamic interception via eBPF-LSM  
+2. stateless structural containment via Seccomp.
 
 ---
 
-## Project Phases
+## 1. Experimental Baseline
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| 1 | VM setup, Apptainer/Docker install, eBPF/strace config, Literature Review | ✅ Done |
-| 2 | Red Team PoC Fileless Malware Loader | ✅ Done |
-| 3 | Deploy PoC inside Apptainer sandbox | ⏳ Next |
-| 4 | Dynamic Analysis & Evaluation (eBPF/strace logs) | 📋 Planned |
+To guarantee the reproducibility of the execution latencies and mitigation responses, the research environment must conform to the following hardware and software specification:
+
+### Host Hardware Platform
+*   **Architecture**: x86_64 CPU (supporting VT-x virtualization).
+*   **Processor Core Isolation**: To eliminate scheduler-induced latency jitter, the host Linux kernel must be booted with the `isolcpus=2,3` boot parameter, reserving logical cores 2 and 3 exclusively for benchmarking.
+
+### Operating System and Kernel
+*   **OS Distribution**: Debian GNU/Linux 13 (trixie)
+*   **Linux Kernel**: Version `6.12.74-amd64` or higher (configured with `CONFIG_BPF_LSM=y` and `CONFIG_SECURITY_LANDLOCK=y`).
+
+### Container Runtimes and Toolchains
+*   **Docker Engine**: Version `26.1.5`
+*   **Apptainer**: Version `1.4.5` (built with squashfs-tools support).
+*   **Compiler & BPF Tooling**: GCC `13.2.0`, Clang `17.0.6`, `bpftool` (v7.4.0), and `libbpf-dev` (v1.3.0).
 
 ---
 
-## Phase 2: Red Team PoC (`poc/`)
+## 2. Compilation Directives
 
-The PoC demonstrates the **T1027.002 (Software Packing / ExecutableInExecutable)** technique, as seen in real-world malware targeting containers and cloud environments:
+The build system is managed via GNU Make. It compiles the userspace binaries, encodes the evasion payload, and compiles the eBPF kernel object files.
 
-- **VoidLink** (Check Point Research, 2026) cloud-native C2 framework, ELF object files loaded in-memory via a custom Plugin API operating on direct syscalls.
-- **Ezuri** (LevelBlue SpiderLabs, 2021) Go-based memory loader using AES-256-CTR encrypted ELFs executed in-memory via `memfd_create`.
-- **Shikitega** (AT&T Alien Labs, 2022) A stealthy multi-stage Linux malware that exploits Docker vulnerabilities and uses the Ezuri loader (`memfd_create`) to execute its crypto-miner entirely in memory.
-- **TeamTNT Cryptojacking Botnet** (Various) A notorious cloud-focused threat actor that frequently leverages `memfd_create` and PRoot to hide their XMRig miners from disk-based container scanners.
-- **Kinsing** (Aqua Security) Container-targeting malware that utilizes memory-backed execution and rootkits to evade detection by standard container security tools.
-- **MITRE ATT&CK T1027.002** Obfuscated Files or Information: Software Packing.
-
-### Build & Run
-
+### 2.1 Core Evasion Framework
+To compile the Red Team Proof-of-Concept (PoC):
 ```bash
-cd poc/
-
-# Full build
 make build
-
-# Execute fileless loader (payload runs in-memory, no shell)
-make run
-
-# Full execution with Reverse Shell (bare host)
-make shell
-
-# Full execution with Reverse Shell from inside Docker container
-make docker-shell
-
-# Capture syscall trace (key evidence for Phase 4)
-make strace
-
-# Demonstrate static scanner gap
-make verify
 ```
+This target executes the following linear pipeline:
+1.  **Payload Compilation**: Compiles `src/payload.c` into a fully static target ELF binary (`bin/payload_elf`).
+2.  **Encoder Generation**: Compiles `src/gen_xor_header.c` to generate the XOR encoder utility (`bin/gen_xor_header`).
+3.  **XOR Obfuscation**: Feeds the raw bytes of `bin/payload_elf` through the encoder, outputting `src/payload_blob.h`, which contains the payload bytes obfuscated with key `0xAB` (evading simple ELF magic signature matching).
+4.  **Loader Compilation**: Compiles `src/loader.c` (incorporating `src/payload_blob.h`) to output the final execution binary (`bin/loader`).
 
+### 2.2 Kernel Telemetry and Dynamic Blocker
+To compile the eBPF LSM security module and its userspace monitor:
+```bash
+make bpf-build
 ```
-payload.c  ──[gcc -static]──►  bin/payload_elf
-                                     │
-                               [gen_xor_header]
-                                     │ XOR key=0xAB
-                                     ▼
-                            src/payload_blob.h   (embedded byte array)
-                                     │
-loader.c  ─────────────────────────►├──[gcc]──►  bin/loader
-                                     
-[bin/loader] → memfd_create("") → write(payload) → fcntl(F_ADD_SEALS) → fexecve()
-                                                                              │
-                                       [payload_elf /bin/sh] ← connect() ←────┘
-```
-
-### Key Syscalls Generated (Detection Targets)
-
-| Syscall | Description |
-|---------|-------------|
-| `memfd_create("", MFD_CLOEXEC\|MFD_ALLOW_SEALING)` | Creates anonymous in-memory file (blank name evasion) |
-| `write(fd, payload_bytes, N)` | Writes decoded ELF into memory |
-| `fcntl(fd, F_ADD_SEALS, F_SEAL_WRITE...)` | Locks the payload read-only (TeamTNT technique) |
-| `execveat(3, "", argv, envp, AT_EMPTY_PATH)` | Executes ELF from fd (fexecve internal) |
-| `socket()`, `connect()`, `dup2()` | TCP reverse shell connection back to C2 |
-
-**eBPF/Falco detection signature:** process launched with `/proc/<pid>/exe` → `/memfd: (deleted)`
+This target executes:
+1.  **Vmlinux Header Extraction**: Invokes `bpftool btf dump file /sys/kernel/btf/vmlinux format c` to generate the kernel definition header `bpf/vmlinux.h`.
+2.  **BPF Bytecode Compilation**: Compiles the C code in `bpf/memfd_exec_block.bpf.c` using Clang target BPF to produce the kernel-space ELF bytecode `bpf/memfd_exec_block.bpf.o`.
+3.  **Userspace Monitor Compilation**: Compiles `bpf/memfd_exec_block.c` with GCC and links against `libbpf` to output the control daemon (`bin/memfd_exec_block`).
 
 ---
 
-## References
+## 3. Execution Parameters
 
-- Check Point Research (2026). *VoidLink: The Cloud-Native Malware Framework*. https://research.checkpoint.com/2026/voidlink-the-cloud-native-malware-framework/
-- LevelBlue SpiderLabs. *Malware Using New Ezuri Memory Loader*. https://www.levelblue.com/blogs/spiderlabs-blog/malware-using-new-ezuri-memory-loader
-- AT&T Alien Labs (2022). *Shikitega - New stealthy malware targeting Linux*. https://cybersecurity.att.com/blogs/labs-research/shikitega-new-stealthy-malware-targeting-linux
-- Aqua Security (2020). *Kinsing Malware: Evolving Tactics in Container Environments*. https://www.aquasec.com/blog/threat-alert-kinsing-malware-container-vulnerability/
-- Unit 42 / Palo Alto Networks. *TeamTNT Cryptojacking Operations*.
-- MITRE ATT&CK. *T1027.002: Software Packing*. https://attack.mitre.org/techniques/T1027/002/
-- Rice, L. (2023). *Container Security* (2nd Ed.). O'Reilly.
+To ensure empirical accuracy, all benchmark runs must use processor pinning via `taskset` to target isolated CPU cores. On systems with 2 logical processors, pin monitoring daemons to Core `0` and benchmark workloads to Core `1`.
+
+### 3.1 Baseline Attack (Control Group)
+This execution establishes the unmitigated attack pathway on both container engines to demonstrate the vulnerability.
+
+#### 3.1.1 Docker Baseline Attack
+1.  **Terminal 1 (C2 Listener)**: Start the netcat listener on Core 1:
+    ```bash
+    taskset -c 1 ncat -lvp 4444
+    ```
+2.  **Terminal 2 (Docker Attack Execution)**: Build the victim container and run the loader:
+    ```bash
+    # Recompile payload for Docker bridge (172.17.0.1) and copy to container
+    make docker-attack
+    
+    # Run the loader inside the container (pinned to Core 1)
+    taskset -c 1 docker exec -i victim-webapp /loader
+    ```
+
+#### 3.1.2 Apptainer Baseline Attack
+1.  **Terminal 1 (C2 Listener)**: Start the netcat listener on Core 1:
+    ```bash
+    taskset -c 1 ncat -lvp 4444
+    ```
+2.  **Terminal 2 (Apptainer Attack Execution)**: Prepare the SIF image and copy the loader:
+    ```bash
+    # Recompile payload for loopback (127.0.0.1) and copy to host /tmp
+    make apptainer-attack
+    
+    # Run the loader inside Apptainer (pinned to Core 1)
+    taskset -c 1 apptainer exec deployment/apptainer-victim.sif /tmp/loader
+    ```
+
+### 3.2 Docker eBPF Defense (Stateful Dynamic Interception)
+This test validates the dynamic blocking of memory execution within a Docker container using the compiled eBPF LSM program.
+
+1.  **Terminal 1 (LSM Monitor)**: Run the eBPF control daemon in host space, pinned to Core 0 (requires sudo):
+    ```bash
+    make docker-defense
+    ```
+2.  **Terminal 2 (C2 Listener)**: Launch the listener on Core 1:
+    ```bash
+    taskset -c 1 ncat -lvp 4444
+    ```
+3.  **Terminal 3 (Container Workload)**: Instantiate the Docker web container and run the loader pinned to Core 1:
+    ```bash
+    # Recompile payload with the docker bridge IP (172.17.0.1)
+    make docker-attack
+    
+    # Run the injected loader inside the container
+    taskset -c 1 docker exec -i victim-webapp /loader
+    ```
+
+### 3.3 Apptainer Seccomp Defense (Stateless Structural Containment)
+This test validates the immediate rejection of anonymous allocations inside an Apptainer container.
+
+1.  **Terminal 1 (C2 Listener)**: Start the listener on Core 1:
+    ```bash
+    taskset -c 1 ncat -lvp 4444
+    ```
+2.  **Terminal 2 (Container Execution)**: Initialize the hardened Apptainer container on Core 1:
+    ```bash
+    # Recompile target for loopback C2 and prepare environment
+    make apptainer-defense
+    
+    # Execute Apptainer with the Seccomp profile JSON attached
+    taskset -c 1 apptainer exec --security seccomp:deployment/seccomp_memfd_exec.json deployment/apptainer-victim.sif /tmp/loader
+    ```
+
+---
+
+## 4. Verification Criteria
+
+Reviewers must inspect the standard output and error descriptors of the loader to verify that the mitigations successfully terminated execution at the correct system call boundary.
+
+### 4.1 Stateful eBPF Mitigation Verification
+During a blocked execution run under Docker with the eBPF LSM module active, the loader output must conform to the following trace:
+```plain
+[LOADER] Starting fileless execution sequence...
+[LOADER] Stage 1: Creating anonymous in-memory file descriptor (memfd)...
+[LOADER] SUCCESS: Obtained fd 3
+[LOADER] Stage 2: Writing 749296 bytes of decrypted payload into fd 3...
+[LOADER] SUCCESS: Wrote 749296 bytes
+[LOADER] Stage 3: Adding write seals to prevent modification...
+[LOADER] SUCCESS: File sealed
+[LOADER] Stage 4: Transferring execution control via fexecve...
+[LOADER] ERROR: fexecve failed: Permission denied
+```
+*   **Verification Check**:
+    1.  The output confirms that `memfd_create` and writing/sealing **succeeded** (fd 3 created).
+    2.  `fexecve` (internally invoking the `execveat` syscall) failed with `Permission denied` (`-EPERM`).
+    3.  This confirms the mitigation triggered at the **LSM execution boundary** (after allocation but prior to execution), matching the flow in **`diagram5.md`**.
+
+### 4.2 Stateless Seccomp Mitigation Verification
+During a blocked execution run under Apptainer with the Seccomp filter active, the loader output must conform to the following trace:
+```plain
+[LOADER] Starting fileless execution sequence...
+[LOADER] Stage 1: Creating anonymous in-memory file descriptor (memfd)...
+[LOADER] ERROR: memfd_create failed: Operation not permitted
+```
+*   **Verification Check**:
+    1.  The loader failed immediately at Stage 1.
+    2.  `memfd_create` failed with `Operation not permitted` (`-EPERM`).
+    3.  This confirms the mitigation triggered at the **system call entry boundary**, completely preventing the memory file descriptor from allocating memory, matching the flow in **`diagram6.md`**.
+
+---
+
+## 5. Architectural Map & UML Alignment
+
+The repository's execution logic is mapped to the architectural specifications in the `diagrams/` directory. Reviewers should consult the corresponding diagram to understand the kernel state transitions:
+
+```
+        README.md (Reproduction Manual)
+               │
+               ▼
+   src/loader.c & src/payload.c  ────────► [diagram1.md] & [diagram2.md] (Scanner Gap Pathway)
+               │
+               ▼
+   Makefile (docker/apptainer-attack) ───► [diagram3.md] (Network Namespaces: Bridge vs Local)
+               │
+               ▼
+   bpf/memfd_exec_block.bpf.c ───────────► [diagram5.md] (eBPF LSM Stateful Block Sequence)
+               │
+               ▼
+   deployment/seccomp_memfd_exec.json ───► [diagram6.md] (Seccomp Stateless Block Flow)
+```
+
+*   **UML System Deployment Model (`diagram1.md`)**: Visualizes the evasion pathway where the decrypted payload execution occurs in-memory (`memfd`), showing how the execution path bypasses the persistent block storage scanned by traditional endpoint agents.
+*   **UML Execution Sequence Model (`diagram2.md`)**: Traces the chronologically numbered interaction between `loader.c`, the host kernel, and the BPF telemetry probes.
+*   **UML Network Topology Model (`diagram3.md`)**: Maps the connection paths for the reverse shell, showing how Docker uses virtual ethernet interfaces (`veth`) and NAT forwarding to reach the host gateway, while Apptainer routes directly via the loopback interface (`lo`).
+*   **UML eBPF LSM Stateful Model (`diagram5.md`)**: Details how the state storage hash map correlates the timestamp from `sys_enter_memfd_create` with the `bprm_check_security` LSM hook to block execution.
+*   **UML Seccomp Stateless Model (`diagram6.md`)**: Details how the Seccomp kernel filter evaluates the system call entry matrix to abort execution at the first `memfd_create` invocation.
+*   **Execution Pipeline (`diagram4.md`)**: Provides a block diagram showing the progression of the loader's execution sequence.

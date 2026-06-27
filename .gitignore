@@ -1,14 +1,20 @@
-# Structurizr configuration and layout data
-.structurizr/
-architecture/.structurizr/
+# Local build directories
+bin/
+logs/
 
-# Compiled binaries and payload outputs
-poc/bin/
-!poc/bin/.gitkeep
+# Compiled objects and bytecodes
+*.o
+*.bpf.o
 
 # Apptainer images
 *.sif
+deployment/*.sif
 
-# Temporary and log files
+# Log outputs and env configuration backups
 *.log
-poc/logs/
+*.env
+
+# Temporary and editor files
+.DS_Store
+.vscode/
+.idea/

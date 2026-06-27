@@ -1,0 +1,19 @@
+%---------------------------------------------------------------------------------------
+%
+%
+% Conclusions section; label will be sec:conclu
+%
+%
+\section*{Conclusions and Future Work}
+\addcontentsline{toc}{section}{Conclusions and Future Work}
+
+%\section{Conclusions and Future Work}
+%\label{sec:conclusions}
+
+The empirical results validate the research hypothesis by establishing that shared-kernel container architectures can defend the host kernel boundary against memory-resident fileless execution without active dynamic monitoring. The measurements show that a native, declarative Seccomp filter denies the \texttt{memfd\_create} system call in 292.82 nanoseconds, halting the exploit chain at the initial memory allocation phase. In contrast, the dynamic eBPF-LSM correlation mechanism requires 832 nanoseconds to detect the sequence and deny the subsequent \texttt{fexecve} system call, resulting in a 539.18-nanosecond latency delta. For shared-kernel environments, this delta represents the boundary between stateless, preemptive resource denial at the system call entry path and stateful, post-allocation behavioral analysis within the active kernel domain. These measurements demonstrate that structural containment provides a lower latency footprint, while dynamic monitoring provides temporal correlation at the cost of processing overhead.
+
+To address the vulnerability of the shared-kernel execution model, future research should investigate the integration of hardware-assisted memory isolation technologies. Specifically, deploying confidential computing frameworks such as Intel Trust Domain Extensions (TDX) or AMD Secure Encrypted Virtualization-Secure Nested Paging (SEV-SNP) within the container runtime lifecycle would allow the hardware-level encryption and isolation of volatile memory segments. This hardware-level containment would prevent unauthorized read or write access to anonymous memory pages even if the shared host kernel interface is compromised, closing the operational gap where a kernel privilege escalation could allow container escapes via volatile memory.
+
+A second research trajectory involves the development of automated telemetry compilation pipelines to generate dynamic Seccomp filters. By parsing the system call surface of containerized workloads during integration testing, these automated pipelines can compile declarative Seccomp allowlists tailored to specific application states. This approach would mitigate the operational rigidity of static profiles in heterogeneous production environments by dynamically compiling and loading tailored filters as application phases transition. This automated compilation reduces the administrative overhead associated with manual profile updates without introducing high-privilege host monitoring daemons.
+
+A final validation vector requires extending these benchmark evaluations to alternative OCI-compliant runtimes, specifically Podman. Future research must quantify how daemonless and rootless execution models impact the latency overhead of both dynamic eBPF hooks and structural Seccomp filters compared to the Docker daemon architecture.
