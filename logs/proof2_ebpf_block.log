@@ -1,0 +1,30 @@
+# Proof 2 — Docker eBPF LSM Defense: Execution Blocked
+# Context: Research on Methods for Application Containment — Vilnius University MICAC
+# Author: Juan Luis Torres Ramos
+# Captured: 2026-06-22 | Kernel: 6.12.74+deb13+1-amd64
+# Process Interception: memfd_create -> fexecve within 5s window
+
+=== 2A: eBPF TELEMETRY OUTPUT (Terminal 1 - root monitor, captured live) ===
+
+[LSM] memfd->exec block active (window=5s, comm=loader)
+[LSM] Ctrl+C to stop
+[BLOCK] pid=31738 uid=0 comm=loader delta_ns=703570 lsm_exec_ns=832
+
+ANALYSIS:
+  - delta_ns=703570 (~0.70ms): Time between memfd_create entry and bprm_check_security LSM hook entry.
+  - lsm_exec_ns=832: Measured CPU execution time of the eBPF LSM policy itself.
+  - Interception matches stateful sequence models in diagrams/diagram5.md.
+
+=== 2B: LOADER EXPLOIT OUTPUT (Terminal 2 - Docker container, blocked) ===
+
+[LOADER] ============================================================
+[LOADER] Fileless Loader
+[LOADER] Technique : memfd_create + fexecve (T1027.002)
+[LOADER] Payload   : 961928 bytes (XOR-encoded, key=0xAB)
+[LOADER] ============================================================
+[LOADER] Step 1: XOR decode  ... OK (961928 bytes)
+[LOADER] Step 2: memfd_create ... OK (fd=3, /proc/self/fd/3 -> /memfd: )
+[LOADER] Step 3: write payload ... OK (961928 bytes to fd)
+[LOADER] Step 3b: memfd sealed (F_SEAL_WRITE|SHRINK|GROW|SEAL) ... OK
+[LOADER] Step 4: fexecve     ... calling (no return on success)
+[LOADER] fexecve: Operation not permitted

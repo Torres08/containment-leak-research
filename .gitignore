@@ -1,6 +1,5 @@
 # Local build directories
 bin/
-logs/
 chapters/
 
 # Compiled objects and bytecodes
@@ -14,6 +13,7 @@ deployment/*.sif
 # Log outputs and env configuration backups
 *.log
 *.env
+!logs/**
 
 # Temporary and editor files
 .DS_Store

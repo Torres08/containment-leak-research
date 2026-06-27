@@ -1,0 +1,7 @@
+# eBPF LSM hook self-timing measurement
+# Date: 2026-06-22
+# Command (Terminal 1): sudo bin/memfd_exec_block
+# Command (Terminal 2): docker exec -i victim-webapp /loader
+# Kernel: 6.12.74+deb13+1-amd64
+# Measurement:
+[BLOCK] pid=31738 uid=0 comm=loader delta_ns=703570 lsm_exec_ns=832

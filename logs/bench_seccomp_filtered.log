@@ -1,0 +1,10 @@
+bench_seccomp: measuring memfd_create() latency over 100000 iterations
+Environment: Apptainer (Seccomp active)
+
+=== RESULTS ===
+Mode            : SECCOMP REJECTION
+Iterations      : 100000
+Total time (ns) : 29282239
+Average (ns)    : 292.82
+Min (ns)        : 23
+Max (ns)        : 900681

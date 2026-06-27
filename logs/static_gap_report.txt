@@ -1,0 +1,45 @@
+============================================================================
+ Static Scanner Gap Verification Report
+ Generated: 2026-06-27T11:12:10 UTC
+ Loader   : bin/loader
+ Payload  : bin/payload_elf
+============================================================================
+
+--- TEST 1: 'file' command magic-byte detection on LOADER ---
+(Does 'file' see an ELF inside the loader?)
+  Result: bin/loader: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=17f1c76ed7d49eaadcd05ca4b37db8854535a481, for GNU/Linux 3.2.0, not stripped
+  (Loader is itself an ELF — expected. Testing for EMBEDDED payload...)
+ [0;32m[PASS][0m 'file' sees only ONE ELF (the loader) — embedded payload NOT detected.
+
+--- TEST 2: 'strings' scan for ELF magic inside LOADER ---
+(Can 'strings' find raw '\x7fELF' bytes?)
+ [0;32m[PASS][0m strings ELF magic: No raw ELF magic found — XOR encoding destroys the signature
+
+--- TEST 3: xxd verify XOR-transformed magic in payload_blob.h ---
+(Confirm the stored bytes are NOT the original ELF bytes)
+  First bytes of blob:  * XOR key : 0xAB
+ [0;32m[PASS][0m xxd XOR magic verify: Blob bytes differ from original ELF magic (XOR applied)
+
+--- TEST 4: xxd ELF magic search in LOADER (beyond its own header) ---
+(Searches for a SECOND ELF magic past the first 64 bytes of the loader)
+ [0;32m[PASS][0m xxd ELF magic in loader body: No ELF magic in loader body (first 64 bytes excluded) — Scanner Gap confirmed
+
+--- TEST 5: Standalone payload 'file' check (BASELINE) ---
+(Confirm the payload IS a valid ELF when unobfuscated)
+  Result: bin/payload_elf: ELF 64-bit LSB executable, x86-64, version 1 (GNU/Linux), statically linked, BuildID[sha1]=d74bec7da5601f653cca409ce182b98ca78de105, for GNU/Linux 3.2.0, not stripped
+ [0;32m[BASELINE OK][0m Standalone payload_elf is a valid ELF (as expected)
+
+============================================================================
+ SUMMARY
+   Tests PASSED (scanner gap confirmed): 4
+   Tests FAILED (scanner detects):       0
+
+ RESEARCH INTERPRETATION:
+   A high PASS score confirms the Scanner Gap hypothesis:
+   static analysis tools are BLIND to the embedded payload.
+   Dynamic monitoring (eBPF/strace) targeting:
+     - memfd_create()   syscall
+     - execveat()       syscall (from fexecve)
+     - /proc/<pid>/exe  pointing to /memfd:* (deleted)
+   is the ONLY reliable detection mechanism.
+============================================================================

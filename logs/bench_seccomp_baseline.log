@@ -1,0 +1,10 @@
+bench_seccomp: measuring memfd_create() latency over 100000 iterations
+Environment: Baseline (no Seccomp)
+
+=== RESULTS ===
+Mode            : BASELINE (no Seccomp)
+Iterations      : 100000
+Total time (ns) : 130709343
+Average (ns)    : 1307.09
+Min (ns)        : 0
+Max (ns)        : 2936934

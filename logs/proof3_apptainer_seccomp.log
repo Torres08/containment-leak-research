@@ -1,0 +1,15 @@
+# Proof 3 — Apptainer Seccomp Defense: Execution Blocked
+# Captured: Sat Jun 27 06:12:25 AM CDT 2026 | Kernel: 6.12.74+deb13+1-amd64
+# ------------------------------------------------------------
+
+=== 3A: LOADER EXPLOIT OUTPUT ===
+[LOADER] ============================================================
+[LOADER] Fileless Loader
+[LOADER] Technique : memfd_create + fexecve (T1027.002)
+[LOADER] Payload   : 961928 bytes (XOR-encoded, key=0xAB)
+[LOADER] ============================================================
+[LOADER] Step 1: XOR decode  ... OK (961928 bytes)
+[LOADER] memfd_create: Operation not permitted
+
+=== 3B: HOST AUDIT LOG ===
+NOTE: auditd is NOT installed on this Debian host.
