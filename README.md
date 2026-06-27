@@ -1,6 +1,6 @@
-# Empirical Reproduction Manual: Container Containment and the Static Scanner Gap
+# Research on methods for application containment PoC
 
-This repository contains the source code, kernel telemetry modules, containment profiles, and architectural models developed to investigate the **Static Scanner Gap in container runtimes. The project demonstrates an ExecutableInExecutable (MITRE ATT&CK T1027.002) evasion vector using memory-backed anonymous files (`memfd_create` + `fexecve`) and implements two defense strategies: 
+This repository contains the source code, kernel telemetry modules, containment profiles, and architectural models developed to investigate the Static Scanner Gap in container runtimes. The project demonstrates an ExecutableInExecutable (MITRE ATT&CK T1027.002) evasion vector using memory-backed anonymous files (`memfd_create` + `fexecve`) and implements two defense strategies: 
 1. stateful dynamic interception via eBPF-LSM  
 2. stateless structural containment via Seccomp.
 
@@ -163,27 +163,11 @@ During a blocked execution run under Apptainer with the Seccomp filter active, t
 
 ## 5. Architectural Map & UML Alignment
 
-The repository's execution logic is mapped to the architectural specifications in the `diagrams/` directory. Reviewers should consult the corresponding diagram to understand the kernel state transitions:
+The repository's execution logic is mapped to the architectural specifications in the `diagrams/` directory:
 
-```
-        README.md (Reproduction Manual)
-               │
-               ▼
-   src/loader.c & src/payload.c  ────────► [diagram1.md] & [diagram2.md] (Scanner Gap Pathway)
-               │
-               ▼
-   Makefile (docker/apptainer-attack) ───► [diagram3.md] (Network Namespaces: Bridge vs Local)
-               │
-               ▼
-   bpf/memfd_exec_block.bpf.c ───────────► [diagram5.md] (eBPF LSM Stateful Block Sequence)
-               │
-               ▼
-   deployment/seccomp_memfd_exec.json ───► [diagram6.md] (Seccomp Stateless Block Flow)
-```
-
-*   **UML System Deployment Model (`diagram1.md`)**: Visualizes the evasion pathway where the decrypted payload execution occurs in-memory (`memfd`), showing how the execution path bypasses the persistent block storage scanned by traditional endpoint agents.
-*   **UML Execution Sequence Model (`diagram2.md`)**: Traces the chronologically numbered interaction between `loader.c`, the host kernel, and the BPF telemetry probes.
-*   **UML Network Topology Model (`diagram3.md`)**: Maps the connection paths for the reverse shell, showing how Docker uses virtual ethernet interfaces (`veth`) and NAT forwarding to reach the host gateway, while Apptainer routes directly via the loopback interface (`lo`).
-*   **UML eBPF LSM Stateful Model (`diagram5.md`)**: Details how the state storage hash map correlates the timestamp from `sys_enter_memfd_create` with the `bprm_check_security` LSM hook to block execution.
-*   **UML Seccomp Stateless Model (`diagram6.md`)**: Details how the Seccomp kernel filter evaluates the system call entry matrix to abort execution at the first `memfd_create` invocation.
-*   **Execution Pipeline (`diagram4.md`)**: Provides a block diagram showing the progression of the loader's execution sequence.
+*   **`diagram1.md` (System Deployment Model)**: Represents the evasion pathway (Scanner Gap) showing how the payload runs in anonymous memory to bypass disk scanners.
+*   **`diagram2.md` (Execution Sequence Model)**: Represents the sequential interactions between the loader, the host kernel, and the BPF telemetry probes.
+*   **`diagram3.md` (Network Topology Model)**: Represents the reverse shell routing topology for the Docker bridge network and the Apptainer loopback network.
+*   **`diagram4.md` (Loader Execution Pipeline)**: Represents the block diagram showing the progression of stages in the loader's execution sequence.
+*   **`diagram5.md` (eBPF LSM Stateful Model)**: Represents the stateful correlation and hooks used by eBPF LSM to intercept the execution window.
+*   **`diagram6.md` (Seccomp Stateless Model)**: Represents the stateless system call entry validation policy applied by Seccomp.
