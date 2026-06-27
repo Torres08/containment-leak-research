@@ -168,8 +168,8 @@ evidence-logs: logs
 	  echo "- **Baseline \`memfd_create\` latency**: ~1263.99 ns (\`logs/bench_seccomp_baseline.log\`)"; \
 	  echo "- **Seccomp rejection latency**: ~284.18 ns (\`logs/bench_seccomp_filtered.log\`)"; \
 	  echo "- **eBPF LSM hook execution latency**: ~832 ns (\`logs/bench_ebpf_lsm.log\`)"; \
-	) > logs/evidence_logs.md
-	@echo "Consolidated index logged to: logs/evidence_logs.md"
+	) > logs/README.md
+	@echo "Consolidated index logged to: logs/README.md"
 
 .PHONY: reproduce
 reproduce: clean build bpf-build

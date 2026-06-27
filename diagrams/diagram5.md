@@ -2,62 +2,60 @@
 skinparam monochrome true
 skinparam shadowing false
 skinparam defaultFontName "Times New Roman"
-skinparam defaultFontSize 13
-skinparam sequenceMessageAlign center
-skinparam roundcorner 0
-skinparam nodesep 40
-skinparam ranksep 40
+skinparam defaultFontSize 16
+skinparam linetype ortho
+skinparam nodesep 100
+skinparam ranksep 100
 
-skinparam participant {
+skinparam activity {
   BorderColor #222222
   BorderThickness 2
   BackgroundColor #FFFFFF
   FontStyle bold
-  FontSize 15
+  FontSize 18
 }
 
 skinparam note {
   BorderColor #777777
   BackgroundColor #FAFAFA
-  FontSize 12
+  FontSize 15
 }
 
-skinparam BoxFontSize 13
-skinparam BoxFontStyle bold
+skinparam swimlane {
+  BorderColor #222222
+  BorderThickness 2
+  TitleFontSize 16
+  TitleFontStyle bold
+}
 
-box "Container Namespace" #F0F0F0
-    participant "Loader Process" as L
-end box
+|Container Namespace (User Space)|
+start
+:Apptainer instantiates runtime\n(applies declarative JSON profile);
+:Loader executes payload sequence;
+:Invoke syscall(memfd_create);
 
-box "Host Kernel Space" #FFFFFF
-    participant "Tracepoint\n(sys_enter)" as TP
-    participant "BPF Hash Map\n(State Storage)" as MAP
-    participant "LSM Hook\n(Enforcement)" as LSM
-    participant "Ring Buffer\n(Telemetry)" as RB
-end box
+|Host Kernel Space (Seccomp-BPF)|
+:Kernel evaluates system call\nagainst immutable matrix;
 
-box "Host User Space" #F0F0F0
-    participant "Defender Daemon" as D
-end box
+note right
+  **Structural Deny List:**
+  1. memfd_create
+  2. execveat
+end note
 
-== Phase 1: Anonymous Allocation ==
-L -> TP : syscall(memfd_create)
-activate TP
-TP -> MAP : Store PID & Timestamp
-TP --> L : Return valid file descriptor (fd)
-deactivate TP
-
-== Phase 2: Stateful Execution Enforcement ==
-L -> LSM : fexecve(fd)
-activate LSM
-LSM -> MAP : Fetch Timestamp for PID
-
-alt Execution < 5s AND Process == "loader"
-    LSM -> RB : Submit Alert Event
-    LSM --> L : Return -EPERM (Block Execution)
-    RB -> D : Trigger User-Space Alert
-else Legitimate Execution Path
-    LSM --> L : Return 0 (Allow Execution)
-end
-deactivate LSM
+if (Syscall matches deny list?) then (Yes)
+  :Kernel immediately returns -EPERM;
+  
+  |Container Namespace (User Space)|
+  :Process receives EPERM\n(Operation not permitted);
+  :Execution terminates (Attack neutralized);
+  stop
+else (No)
+  |Host Kernel Space (Seccomp-BPF)|
+  :System call permitted;
+  
+  |Container Namespace (User Space)|
+  :Continue legitimate execution;
+  detach
+endif
 @enduml
