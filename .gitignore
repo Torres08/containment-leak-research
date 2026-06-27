@@ -1,6 +1,7 @@
 # Local build directories
 bin/
 logs/
+chapters/
 
 # Compiled objects and bytecodes
 *.o
