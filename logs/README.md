@@ -1,4 +1,4 @@
-# Empirical Evidence Logs: Container Containment and the Static Scanner Gap
+# Evidence Logs
 
 This directory contains the telemetry traces, loader outputs, and benchmarks validating the containment profile results.
 
