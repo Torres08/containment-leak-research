@@ -12,7 +12,7 @@ skinparam ArrowThickness 1.2
 skinparam ArrowColor #333333
 
 skinparam node {
-  BorderColor #222222
+  BorderColor #8d0909
   BorderThickness 2
   BackgroundColor #FFFFFF
   FontStyle bold
@@ -41,7 +41,7 @@ skinparam note {
 
 ' ====== Remote C2 ======
 node "Remote Command & Control" as c2_node {
-  component "C2 Listener\n(Neat 7.95)" as c2
+  component "C2 Listener\n(ncat)" as c2
 }
 
 ' ====== Host machine ======

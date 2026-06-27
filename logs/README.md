@@ -2,6 +2,10 @@
 
 This directory contains the telemetry traces, loader outputs, and benchmarks validating the containment profile results.
 
+## Version Audit
+- **Path**: `logs/version_report.txt`
+- **Result**: Captures the current VM's OS, kernel, CPU, memory, and tool versions used to synchronize the repository documentation.
+
 ## Proof 1A — Docker Baseline Attack (Control Group)
 - **Path**: `logs/proof1_baseline_attack.log`
 - **Result**: Successful fileless execution. Payload executed from memory (`/memfd: (deleted)`), bypassed static scanning, and successfully connected a reverse shell inside Docker.
@@ -16,9 +20,9 @@ This directory contains the telemetry traces, loader outputs, and benchmarks val
 
 ## Proof 3 — Apptainer Seccomp Defense (Stateless Structural Containment)
 - **Path**: `logs/proof3_apptainer_seccomp.log`
-- **Result**: Intervention successful. The Seccomp filter rejected the `memfd_create` syscall at the entry boundary with `-EPERM`. Rejection latency: **284.18 ns**.
+- **Result**: Intervention successful. The Seccomp filter rejected the `memfd_create` syscall at the entry boundary with `-EPERM`. Rejection latency: **292.82 ns**.
 
 ## Comparative Performance Benchmarks
 - **Baseline `memfd_create` latency**: ~1263.99 ns (`logs/bench_seccomp_baseline.log`)
-- **Seccomp rejection latency**: ~284.18 ns (`logs/bench_seccomp_filtered.log`)
+- **Seccomp rejection latency**: ~292.82 ns (`logs/bench_seccomp_filtered.log`)
 - **eBPF LSM hook execution latency**: ~832 ns (`logs/bench_ebpf_lsm.log`)

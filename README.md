@@ -12,16 +12,17 @@ To guarantee the reproducibility of the execution latencies and mitigation respo
 
 ### Host Hardware Platform
 *   **Architecture**: x86_64 CPU (supporting VT-x virtualization).
-*   **Processor Core Isolation**: To eliminate scheduler-induced latency jitter, the host Linux kernel must be booted with the `isolcpus=2,3` boot parameter, reserving logical cores 2 and 3 exclusively for benchmarking.
+*   **Virtualized Host Resources**: The current VM exposes 2 logical x86_64 CPUs and approximately 3.8 GiB of RAM.
+*   **Processor Core Isolation**: To minimize scheduler-induced latency jitter, benchmark daemons are pinned to Core `0` and workload processes are pinned to Core `1` with `taskset`.
 
 ### Operating System and Kernel
 *   **OS Distribution**: Debian GNU/Linux 13 (trixie)
-*   **Linux Kernel**: Version `6.12.74-amd64` or higher (configured with `CONFIG_BPF_LSM=y` and `CONFIG_SECURITY_LANDLOCK=y`).
+*   **Linux Kernel**: Version `6.12.74+deb13+1-amd64` (configured with `CONFIG_BPF_LSM=y` and `CONFIG_SECURITY_LANDLOCK=y`).
 
 ### Container Runtimes and Toolchains
 *   **Docker Engine**: Version `26.1.5`
 *   **Apptainer**: Version `1.4.5` (built with squashfs-tools support).
-*   **Compiler & BPF Tooling**: GCC `13.2.0`, Clang `17.0.6`, `bpftool` (v7.4.0), and `libbpf-dev` (v1.3.0).
+*   **Compiler & BPF Tooling**: GCC `14.2.0`, Clang `19.1.7`, and `bpftool` (v7.5.0, libbpf v1.5).
 
 ---
 

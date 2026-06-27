@@ -1,0 +1,20 @@
+# Version Audit Report
+
+Checked on 2026-06-27 from the current VM.
+
+## Operating System
+- OS: Debian GNU/Linux 13 (trixie)
+- Kernel: 6.12.74+deb13+1-amd64
+
+## Hardware Summary
+- Architecture: x86_64
+- CPU cores (nproc): 2
+- Memory total: 3.8 GiB
+
+## Runtime and Toolchain
+- Docker: Docker version 26.1.5+dfsg1, build a72d7cd
+- Apptainer: apptainer version 1.4.5
+- GCC: gcc (Debian 14.2.0-19) 14.2.0
+- Clang: Debian clang version 19.1.7 (3+b1)
+- bpftool: bpftool v7.5.0 (using libbpf v1.5)
+- libbpf-dev via pkg-config: not installed
